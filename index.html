@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PRO.TAC 6-a-side | Advanced Tactics Board</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .pitch-pattern {
+            background-color: #1b4332;
+            background-image: repeating-linear-gradient(0deg, #1b4332, #1b4332 40px, #2d6a4f 40px, #2d6a4f 80px);
+        }
+        .player-token {
+            touch-action: none;
+            user-select: none;
+            transition: transform 0.1s ease;
+        }
+        .player-token:active {
+            transform: scale(1.15);
+            z-index: 50;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans">
+
+    <!-- LOGIN OVERLAY -->
+    <div id="auth-modal" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl">
+            <div class="text-center mb-6">
+                <h1 class="text-3xl font-black text-emerald-400 tracking-wider">PRO.TAC</h1>
+                <p class="text-xs text-slate-400 font-medium tracking-widest mt-1">6-A-SIDE EDITION</p>
+            </div>
+            
+            <form id="auth-form" class="space-y-4" onsubmit="return false;">
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Manager Email</label>
+                    <input type="email" id="auth-email" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2.5 text-slate-200 focus:outline-none focus:border-emerald-500 text-sm" placeholder="manager@team.com">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Security Key (Password)</label>
+                    <input type="password" id="auth-password" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2.5 text-slate-200 focus:outline-none focus:border-emerald-500 text-sm" placeholder="••••••••">
+                </div>
+                
+                <div id="auth-error" class="hidden text-xs text-red-400 bg-red-950/50 border border-red-800 rounded-lg p-2.5 text-center"></div>
+
+                <div class="pt-2 space-y-2">
+                    <button type="button" id="btn-login" class="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-2.5 rounded-lg text-sm transition">ACCESS BOARD (LOGIN)</button>
+                    <button type="button" id="btn-signup" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold py-2.5 rounded-lg text-sm transition">REGISTER NEW CLUB</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MAIN APP HEADER -->
+    <header class="bg-slate-900 border-b border-slate-800 px-4 py-3 flex justify-between items-center shrink-0">
+        <div class="flex items-center space-x-3">
+            <i class="fa-solid font-bold fa-futbol text-emerald-400 text-xl"></i>
+            <span class="font-black tracking-wider text-slate-200">PRO.TAC <span class="text-xs font-normal text-emerald-400">6v6</span></span>
+        </div>
+        <div class="flex items-center space-x-3">
+            <span id="user-display" class="text-xs text-slate-400">Not Logged In</span>
+            <button id="btn-logout" class="hidden bg-slate-800 hover:bg-red-950 hover:text-red-400 text-slate-300 text-xs px-3 py-1.5 rounded-md transition">Logout</button>
+        </div>
+    </header>
+
+    <!-- MAIN WORKSPACE -->
+    <main class="flex-1 flex flex-col md:flex-row overflow-hidden">
+        
+        <!-- SIDEBAR / CONTROLS -->
+        <aside class="w-full md:w-80 bg-slate-900 border-r border-slate-800 p-4 flex flex-col space-y-4 overflow-y-auto shrink-0">
+            <div>
+                <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Formations</h2>
+                <div class="grid grid-cols-3 gap-2">
+                    <button onclick="applyFormation('2-2-1')" class="bg-slate-800 hover:bg-slate-700 text-xs py-2 rounded font-semibold">2-2-1</button>
+                    <button onclick="applyFormation('3-1-1')" class="bg-slate-800 hover:bg-slate-700 text-xs py-2 rounded font-semibold">3-1-1</button>
+                    <button onclick="applyFormation('2-1-2')" class="bg-slate-800 hover:bg-slate-700 text-xs py-2 rounded font-semibold">2-1-2</button>
+                </div>
+            </div>
+
+            <div>
+                <div class="flex justify-between items-center mb-2">
+                    <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Squad Management</h2>
+                    <button onclick="addPlayer()" class="text-xs text-emerald-400 hover:underline"><i class="fa-solid fa-plus"></i> Add Player</button>
+                </div>
+                <div id="player-list" class="space-y-2 max-h-48 overflow-y-auto pr-1">
+                    <!-- Player edit inputs -->
+                </div>
+            </div>
+
+            <div class="pt-4 border-t border-slate-800 space-y-2 mt-auto">
+                <button id="btn-save" class="w-full bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold py-2 rounded text-xs transition"><i class="fa-solid fa-cloud-arrow-up"></i> SAVE TACTIC TO CLOUD</button>
+                <button id="btn-load" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold py-2 rounded text-xs transition"><i class="fa-solid fa-cloud-arrow-down"></i> LOAD SAVED TACTIC</button>
+            </div>
+        </aside>
+
+        <!-- VERTICAL PITCH DISPLAY -->
+        <section class="flex-1 bg-slate-950 p-4 flex justify-center items-center overflow-auto">
+            <div class="relative w-full max-w-md h-[600px] pitch-pattern rounded-xl border-4 border-slate-300/20 shadow-2xl overflow-hidden flex flex-col justify-between" id="pitch-container">
+                
+                <!-- Penalty Box Top -->
+                <div class="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-24 border-b-2 border-x-2 border-white/40"></div>
+                <!-- Goal Box Top -->
+                <div class="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-10 border-b-2 border-x-2 border-white/40"></div>
+
+                <!-- Center Line & Circle -->
+                <div class="absolute top-1/2 left-0 right-0 h-0.5 bg-white/40 -translate-y-1/2"></div>
+                <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-28 h-28 border-2 border-white/40 rounded-full"></div>
+
+                <!-- Penalty Box Bottom -->
+                <div class="absolute bottom-0 left-1/2 -translate-x-1/2 w-48 h-24 border-t-2 border-x-2 border-white/40"></div>
+                <!-- Goal Box Bottom -->
+                <div class="absolute bottom-0 left-1/2 -translate-x-1/2 w-24 h-10 border-t-2 border-x-2 border-white/40"></div>
+
+                <!-- Pitch Area -->
+                <div id="pitch" class="absolute inset-0"></div>
+
+                <!-- Bench Zone -->
+                <div id="bench" class="absolute bottom-2 left-2 right-2 h-16 bg-slate-900/80 backdrop-blur-md rounded-lg border border-slate-700/50 flex items-center justify-start px-3 space-x-3 overflow-x-auto z-10">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest rotate-180 [writing-mode:vertical-lr]">BENCH</span>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- FIREBASE SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        // ตั้งค่า Firebase จริงของคุณแล้ว
+        const firebaseConfig = {
+            apiKey: "AIzaSyAhEeUNqHQhe-hzgp8w4nFpL2X9I3UEgFU",
+            authDomain: "football-tactics-78a19.firebaseapp.com",
+            projectId: "football-tactics-78a19",
+            storageBucket: "football-tactics-78a19.firebasestorage.app",
+            messagingSenderId: "365077904900",
+            appId: "1:365077904900:web:d04283ddc696012b2dff51"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        let currentUser = null;
+
+        let players = [
+            { id: 1, name: "GK", number: 1, role: "GK", x: 45, y: 85, onBench: false },
+            { id: 2, name: "CB-L", number: 4, role: "DF", x: 25, y: 65, onBench: false },
+            { id: 3, name: "CB-R", number: 5, role: "DF", x: 65, y: 65, onBench: false },
+            { id: 4, name: "CM-L", number: 8, role: "MF", x: 30, y: 40, onBench: false },
+            { id: 5, name: "CM-R", number: 10, role: "MF", x: 60, y: 40, onBench: false },
+            { id: 6, name: "ST", number: 9, role: "FW", x: 45, y: 18, onBench: false },
+            { id: 7, name: "SUB 1", number: 12, role: "SUB", x: 0, y: 0, onBench: true },
+            { id: 8, name: "SUB 2", number: 14, role: "SUB", x: 0, y: 0, onBench: true }
+        ];
+
+        document.getElementById('btn-login').addEventListener('click', async () => {
+            const email = document.getElementById('auth-email').value;
+            const password = document.getElementById('auth-password').value;
+            try {
+                await signInWithEmailAndPassword(auth, email, password);
+                hideAuthModal();
+            } catch (err) {
+                showAuthError(err.message);
+            }
+        });
+
+        document.getElementById('btn-signup').addEventListener('click', async () => {
+            const email = document.getElementById('auth-email').value;
+            const password = document.getElementById('auth-password').value;
+            try {
+                await createUserWithEmailAndPassword(auth, email, password);
+                hideAuthModal();
+            } catch (err) {
+                showAuthError(err.message);
+            }
+        });
+
+        document.getElementById('btn-logout').addEventListener('click', () => signOut(auth));
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                currentUser = user;
+                document.getElementById('user-display').textContent = user.email;
+                document.getElementById('btn-logout').classList.remove('hidden');
+                hideAuthModal();
+                loadTactic();
+            } else {
+                currentUser = null;
+                document.getElementById('user-display').textContent = 'Not Logged In';
+                document.getElementById('btn-logout').classList.add('hidden');
+                showAuthModal();
+            }
+        });
+
+        function showAuthModal() { document.getElementById('auth-modal').classList.remove('hidden'); }
+        function hideAuthModal() { document.getElementById('auth-modal').classList.add('hidden'); }
+        function showAuthError(msg) {
+            const errEl = document.getElementById('auth-error');
+            errEl.textContent = msg;
+            errEl.classList.remove('hidden');
+        }
+
+        window.renderBoard = function() {
+            const pitch = document.getElementById('pitch');
+            const bench = document.getElementById('bench');
+            const playerList = document.getElementById('player-list');
+            
+            pitch.innerHTML = '';
+            playerList.innerHTML = '';
+            
+            const benchTitle = bench.querySelector('span');
+            bench.innerHTML = '';
+            if(benchTitle) bench.appendChild(benchTitle);
+
+            players.forEach((p) => {
+                const listRow = document.createElement('div');
+                listRow.className = "flex items-center space-x-2 bg-slate-800 p-2 rounded text-xs";
+                listRow.innerHTML = `
+                    <input type="text" value="${p.name}" onchange="updatePlayerName(${p.id}, this.value)" class="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-200 w-24">
+                    <input type="number" value="${p.number}" onchange="updatePlayerNumber(${p.id}, this.value)" class="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-200 w-12 text-center">
+                    <button onclick="toggleBench(${p.id})" class="text-slate-400 hover:text-emerald-400 text-xs px-1">${p.onBench ? 'Field' : 'Bench'}</button>
+                    <button onclick="removePlayer(${p.id})" class="text-red-400 hover:text-red-300 text-xs px-1"><i class="fa-solid fa-xmark"></i></button>
+                `;
+                playerList.appendChild(listRow);
+
+                const token = document.createElement('div');
+                token.className = `player-token absolute flex flex-col items-center justify-center cursor-pointer ${p.onBench ? 'relative' : ''}`;
+                
+                const tokenColor = p.role === 'GK' ? 'bg-amber-500' : 'bg-emerald-500';
+
+                token.innerHTML = `
+                    <div class="w-9 h-9 ${tokenColor} text-slate-950 font-black rounded-full flex items-center justify-center shadow-lg border-2 border-white/80 text-xs">
+                        ${p.number}
+                    </div>
+                    <span class="text-[10px] font-bold bg-slate-950/80 px-1.5 py-0.5 rounded text-slate-200 mt-0.5 whitespace-nowrap">${p.name}</span>
+                `;
+
+                if (!p.onBench) {
+                    token.style.left = `${p.x}%`;
+                    token.style.top = `${p.y}%`;
+                    makeDraggable(token, p.id);
+                    pitch.appendChild(token);
+                } else {
+                    token.onclick = () => toggleBench(p.id);
+                    bench.appendChild(token);
+                }
+            });
+        }
+
+        function makeDraggable(elmnt, id) {
+            let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+            elmnt.onmousedown = dragMouseDown;
+            elmnt.ontouchstart = dragMouseDown;
+
+            function dragMouseDown(e) {
+                e = e || window.event;
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                pos3 = clientX;
+                pos4 = clientY;
+                document.onmouseup = closeDragElement;
+                document.ontouchend = closeDragElement;
+                document.onmousemove = elementDrag;
+                document.ontouchmove = elementDrag;
+            }
+
+            function elementDrag(e) {
+                e = e || window.event;
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                pos1 = pos3 - clientX;
+                pos2 = pos4 - clientY;
+                pos3 = clientX;
+                pos4 = clientY;
+
+                const pitchContainer = document.getElementById('pitch-container');
+                const rect = pitchContainer.getBoundingClientRect();
+
+                let newY = ((elmnt.offsetTop - pos2) / rect.height) * 100;
+                let newX = ((elmnt.offsetLeft - pos1) / rect.width) * 100;
+
+                newX = Math.max(2, Math.min(88, newX));
+                newY = Math.max(2, Math.min(88, newY));
+
+                elmnt.style.top = newY + "%";
+                elmnt.style.left = newX + "%";
+
+                const player = players.find(p => p.id === id);
+                if (player) {
+                    player.x = newX;
+                    player.y = newY;
+                }
+            }
+
+            function closeDragElement() {
+                document.onmouseup = null;
+                document.onmousemove = null;
+                document.ontouchend = null;
+                document.ontouchmove = null;
+            }
+        }
+
+        window.updatePlayerName = function(id, val) {
+            const p = players.find(x => x.id === id);
+            if (p) { p.name = val; renderBoard(); }
+        }
+
+        window.updatePlayerNumber = function(id, val) {
+            const p = players.find(x => x.id === id);
+            if (p) { p.number = val; renderBoard(); }
+        }
+
+        window.toggleBench = function(id) {
+            const p = players.find(x => x.id === id);
+            if (p) {
+                p.onBench = !p.onBench;
+                if (!p.onBench) { p.x = 45; p.y = 50; }
+                renderBoard();
+            }
+        }
+
+        window.removePlayer = function(id) {
+            players = players.filter(p => p.id !== id);
+            renderBoard();
+        }
+
+        window.addPlayer = function() {
+            const newId = Date.now();
+            players.push({ id: newId, name: "SUB", number: 99, role: "SUB", x: 45, y: 50, onBench: true });
+            renderBoard();
+        }
+
+        window.applyFormation = function(type) {
+            const activeOnField = players.filter(p => !p.onBench && p.role !== 'GK');
+            if (type === '2-2-1' && activeOnField.length >= 5) {
+                activeOnField[0].x = 25; activeOnField[0].y = 65;
+                activeOnField[1].x = 65; activeOnField[1].y = 65;
+                activeOnField[2].x = 30; activeOnField[2].y = 40;
+                activeOnField[3].x = 60; activeOnField[3].y = 40;
+                activeOnField[4].x = 45; activeOnField[4].y = 18;
+            } else if (type === '3-1-1' && activeOnField.length >= 5) {
+                activeOnField[0].x = 20; activeOnField[0].y = 65;
+                activeOnField[1].x = 45; activeOnField[1].y = 68;
+                activeOnField[2].x = 70; activeOnField[2].y = 65;
+                activeOnField[3].x = 45; activeOnField[3].y = 42;
+                activeOnField[4].x = 45; activeOnField[4].y = 18;
+            } else if (type === '2-1-2' && activeOnField.length >= 5) {
+                activeOnField[0].x = 25; activeOnField[0].y = 65;
+                activeOnField[1].x = 65; activeOnField[1].y = 65;
+                activeOnField[2].x = 45; activeOnField[2].y = 45;
+                activeOnField[3].x = 30; activeOnField[3].y = 20;
+                activeOnField[4].x = 60; activeOnField[4].y = 20;
+            }
+            renderBoard();
+        }
+
+        document.getElementById('btn-save').addEventListener('click', async () => {
+            if (!currentUser) return;
+            try {
+                await setDoc(doc(db, "tactics", currentUser.uid), { players: players });
+                alert('Tactic saved successfully to cloud!');
+            } catch (err) {
+                alert('Error saving tactic: ' + err.message);
+            }
+        });
+
+        async function loadTactic() {
+            if (!currentUser) return;
+            try {
+                const docSnap = await getDoc(doc(db, "tactics", currentUser.uid));
+                if (docSnap.exists()) {
+                    players = docSnap.data().players;
+                    renderBoard();
+                }
+            } catch (err) {
+                console.error("Error loading tactic:", err);
+            }
+        }
+        document.getElementById('btn-load').addEventListener('click', loadTactic);
+
+        renderBoard();
+    </script>
+</body>
+</html>
